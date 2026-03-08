@@ -601,8 +601,6 @@ def reset_session(session_id):
 
 @app.route('/analyze_frame', methods=['POST'])
 def analyze_frame():
-    if net is None:
-        return jsonify({'success': False, 'error': 'Face detector model not loaded.'}), 500
     if 'frame' not in request.files:
         return jsonify({'success': False, 'error': 'No frame provided.'}), 400
 
@@ -610,35 +608,51 @@ def analyze_frame():
     npimg = np.frombuffer(file.read(), np.uint8)
     frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
+    if frame is None:
+        return jsonify({'success': False, 'error': 'Could not decode frame.'}), 400
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     (h, w) = frame.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
-    net.setInput(blob)
-    detections = net.forward()
 
-    # Find the most confident face detection
-    best_detection_idx = -1
-    highest_confidence = 0.0
-    for i in range(0, detections.shape[2]):
-        confidence = detections[0, 0, i, 2]
-        if confidence > highest_confidence:
-            highest_confidence = confidence
-            best_detection_idx = i
+    # Try MobileNet-SSD first if model is loaded
+    if net is not None:
+        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+        net.setInput(blob)
+        detections = net.forward()
+        best_detection_idx = -1
+        highest_confidence = 0.0
+        for i in range(0, detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > highest_confidence:
+                highest_confidence = confidence
+                best_detection_idx = i
+        if highest_confidence > 0.6:
+            box = detections[0, 0, best_detection_idx, 3:7] * np.array([w, h, w, h])
+            (startX, startY, endX, endY) = box.astype("int")
+            landmarks = {
+                "left_eye": {"x": int(startX + (endX - startX) * 0.25), "y": int(startY + (endY - startY) * 0.3)},
+                "right_eye": {"x": int(startX + (endX - startX) * 0.75), "y": int(startY + (endY - startY) * 0.3)},
+                "nose": {"x": int(startX + (endX - startX) * 0.5), "y": int(startY + (endY - startY) * 0.5)},
+                "mouth": {"x": int(startX + (endX - startX) * 0.5), "y": int(startY + (endY - startY) * 0.8)},
+            }
+            return jsonify({'success': True, 'landmarks': landmarks})
 
-    if highest_confidence > 0.6: # Confidence threshold
-        box = detections[0, 0, best_detection_idx, 3:7] * np.array([w, h, w, h])
-        (startX, startY, endX, endY) = box.astype("int")
-        
-        # Simple estimation of landmarks based on the bounding box
-        # This is a basic approximation. A real landmark detector model would be more accurate.
+    # Fallback: use OpenCV built-in Haar Cascade (no model files needed)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+
+    if len(faces) > 0:
+        (startX, startY, fw, fh) = faces[0]
+        endX, endY = startX + fw, startY + fh
         landmarks = {
-            "left_eye": {"x": int(startX + (endX - startX) * 0.25), "y": int(startY + (endY - startY) * 0.3)},
-            "right_eye": {"x": int(startX + (endX - startX) * 0.75), "y": int(startY + (endY - startY) * 0.3)},
-            "nose": {"x": int(startX + (endX - startX) * 0.5), "y": int(startY + (endY - startY) * 0.5)},
-            "mouth": {"x": int(startX + (endX - startX) * 0.5), "y": int(startY + (endY - startY) * 0.8)},
+            "left_eye": {"x": int(startX + fw * 0.25), "y": int(startY + fh * 0.3)},
+            "right_eye": {"x": int(startX + fw * 0.75), "y": int(startY + fh * 0.3)},
+            "nose": {"x": int(startX + fw * 0.5), "y": int(startY + fh * 0.5)},
+            "mouth": {"x": int(startX + fw * 0.5), "y": int(startY + fh * 0.8)},
         }
         return jsonify({'success': True, 'landmarks': landmarks})
     else:
-        return jsonify({'success': False, 'error': 'No face detected.'})
+        return jsonify({'success': False, 'error': 'No face detected. Please look directly at the camera.'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)

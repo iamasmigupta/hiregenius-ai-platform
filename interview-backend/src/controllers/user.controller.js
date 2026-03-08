@@ -141,7 +141,7 @@ const changePassword = async (req, res) => {
 const deleteAccount = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    await user.remove();
+    await User.findByIdAndDelete(req.user.id);
     // Optionally: Invalidate session/token here
     res.json({ success: true, message: 'Account deleted' });
 };

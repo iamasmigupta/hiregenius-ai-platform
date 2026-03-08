@@ -7,8 +7,8 @@ const config = require('../config');
 const transporter = nodemailer.createTransport(
   smtpTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // uses STARTTLS
+    port: 465,
+    secure: true, // SSL
     auth: {
       user: config.senderEmail,
       pass: config.senderPassword,

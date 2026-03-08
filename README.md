@@ -1,5 +1,7 @@
 # 🧠 HireGenius — AI-Powered Interview Platform
 
+🔗 **Live Demo**: [letshiregenius.vercel.app](https://letshiregenius.vercel.app)
+
 A full-stack platform for conducting **AI-proctored, automated interviews**. HireGenius enables organizations to create interview templates, invite candidates, and conduct interviews with real-time AI proctoring, speech-to-text transcription, and automated scoring.
 
 ## ✨ Key Features

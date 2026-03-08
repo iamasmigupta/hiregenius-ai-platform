@@ -41,11 +41,24 @@ const audioFileFilter = (req, file, cb) => {
 };
 const upload = multer({ storage: storage, fileFilter: audioFileFilter, limits: { fileSize: 25 * 1024 * 1024 } });
 
+// Resume upload uses memory storage (no need to save to disk)
+const resumeUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files are allowed.'), false);
+        }
+    },
+});
+
 
 // --- Route Definitions ---
 
 router.post('/transcribe', protect, upload.single('audio'), asyncHandler(transcribeResponse));
-router.post('/sessions', protect, authorize('admin', 'interviewer', 'hr_manager'), asyncHandler(createSession));
+router.post('/sessions', protect, authorize('admin', 'interviewer', 'hr_manager'), resumeUpload.single('resume'), asyncHandler(createSession));
 router.post('/sessions/:sessionId/responses', protect, asyncHandler(submitResponse));
 router.get('/sessions/my-sessions', protect, authorize('candidate'), asyncHandler(getMySessions));
 router.get(

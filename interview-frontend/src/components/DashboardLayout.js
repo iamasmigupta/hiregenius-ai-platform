@@ -99,8 +99,8 @@ const DashboardLayout = ({ activePath, onNavigate, onLogout, children }) => {
             <Typography variant="caption" sx={{ color: '#bdbdbd', fontSize: '0.65rem', display: 'block' }}>
               Made with ❤️ by Asmi Gupta
             </Typography>
-            <Typography variant="caption" sx={{ color: '#555', fontSize: '0.6rem', display: 'block', mt: 0.3 }}>
-              © Copyright HireGenius 2026
+            <Typography variant="caption" sx={{ color: '#888', fontSize: '0.6rem', display: 'block', mt: 0.3 }}>
+              © 2026 | HireGenius
             </Typography>
           </Box>
         )}

@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const smtpTransport = require('nodemailer-smtp-transport');
+const ical = require('ical-generator').default;
 const config = require('../config');
 
 // Create transporter using credentials from .env
@@ -34,49 +35,91 @@ const bodyStyle = `padding: 30px; color: ${mailStyles.textColor}; line-height: 1
 const buttonStyle = `display: inline-block; padding: 12px 24px; background-color: ${mailStyles.accentColor}; color: ${mailStyles.buttonTextColor}; text-decoration: none; border-radius: 6px; font-weight: bold;`;
 const footerStyle = `text-align: center; font-size: 12px; color: #777777; padding: 20px 30px; border-top: 1px solid ${mailStyles.borderColor};`;
 
+// Logo path for CID email attachment
+const path = require('path');
+const logoPath = path.join(__dirname, '..', '..', 'public', 'logo-hiregenius.png');
+const emailHeader = (title = 'HireGenius') => `<div style="${headerStyle}"><h1 style="${headerTextStyle}"><img src="cid:hiregenius-logo" alt="" style="height:32px;width:32px;vertical-align:middle;margin-right:8px;" />${title}</h1></div>`;
+
 /**
- * Generic mail sending function
+ * Generic mail sending function — auto-attaches logo for CID embedding
  * @param {object} mailOptions - Nodemailer mail options
  */
 const sendMail = async (mailOptions) => {
   try {
-    const baseOptions = {
-      from: `"HireGenius" <${config.senderEmail}>`
+    const logoAttachment = {
+      filename: 'logo-hiregenius.png',
+      path: logoPath,
+      cid: 'hiregenius-logo',
     };
-    await transporter.sendMail({ ...baseOptions, ...mailOptions });
+    const baseOptions = {
+      from: `"HireGenius" <${config.senderEmail}>`,
+      attachments: [...(mailOptions.attachments || []), logoAttachment],
+    };
+    await transporter.sendMail({ ...baseOptions, ...mailOptions, attachments: baseOptions.attachments });
     console.log(`Email sent successfully to ${mailOptions.to}`);
   } catch (error) {
     console.error(`Failed to send email to ${mailOptions.to}:`, error);
-    // In a production app, you'd want more robust error handling, e.g., logging to a service
   }
 };
 
 /**
- * Sends an interview invitation email to a candidate.
+ * Sends an interview invitation email to a candidate with a .ics calendar invite.
  * @param {string} to - Candidate's email address
  * @param {string} link - Unique interview link
  * @param {string} candidateName - Candidate's first name
+ * @param {object} [scheduleInfo] - Optional scheduling details
+ * @param {Date|string} [scheduleInfo.scheduledAt] - Interview start time
+ * @param {number} [scheduleInfo.durationMinutes] - Interview duration in minutes
+ * @param {string} [scheduleInfo.templateTitle] - Name of the interview template
  */
-const sendInviteEmail = async (to, link, candidateName) => {
+const sendInviteEmail = async (to, link, candidateName, scheduleInfo = {}) => {
+  const { scheduledAt, durationMinutes = 60, templateTitle = 'AI Interview' } = scheduleInfo;
+
   const mailOptions = {
     to,
     subject: 'Your AI Interview Invitation',
     html: `
       <div style="${mainContainerStyle}">
         <div style="${contentWrapperStyle}">
-          <div style="${headerStyle}"><h1 style="${headerTextStyle}">HireGenius</h1></div>
+          ${emailHeader('HireGenius')}
           <div style="${bodyStyle}">
             <h2 style="color: #FFFFFF;">Hello ${candidateName},</h2>
-            <p>You have been invited to participate in an AI-powered interview. Please click the button below to begin.</p>
+            <p>You have been invited to participate in an AI-powered interview.</p>
+            ${scheduledAt ? `<p style="padding: 12px 16px; background: #252525; border-radius: 6px; border-left: 4px solid #FFE066;"><strong style="color: #FFE066;">📅 Scheduled:</strong> ${new Date(scheduledAt).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}<br/><strong style="color: #FFE066;">⏱ Duration:</strong> ${durationMinutes} minutes<br/><strong style="color: #FFE066;">📋 Template:</strong> ${templateTitle}</p>` : ''}
             <p style="margin: 30px 0;"><a href="${link}" style="${buttonStyle}">Begin Interview</a></p>
+            ${scheduledAt ? '<p style="color: #bdbdbd;">📎 A calendar invite (.ics) is attached to this email. Add it to your calendar so you don\'t miss it!</p>' : ''}
             <p>If you encounter any issues, please contact the hiring manager.</p>
             <p>Best of luck!</p>
           </div>
-          <div style="${footerStyle}">  ${new Date().getFullYear()} | HireGenius</div>
+          <div style="${footerStyle}">© ${new Date().getFullYear()} | HireGenius</div>
         </div>
       </div>
     `
   };
+
+  // Generate .ics calendar attachment if schedule info is provided
+  if (scheduledAt) {
+    const startDate = new Date(scheduledAt);
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+    const calendar = ical({ name: 'HireGenius Interview' });
+    calendar.createEvent({
+      start: startDate,
+      end: endDate,
+      summary: `HireGenius AI Interview - ${templateTitle}`,
+      description: `Your AI-powered interview is scheduled.\n\nInterview Link: ${link}\n\nPlease make sure you have a working webcam and microphone.`,
+      location: link,
+      url: link,
+      organizer: { name: 'HireGenius', email: config.senderEmail },
+    });
+
+    mailOptions.attachments = [{
+      filename: 'interview-invite.ics',
+      content: calendar.toString(),
+      contentType: 'text/calendar; method=REQUEST',
+    }];
+  }
+
   await sendMail(mailOptions);
 };
 
@@ -93,7 +136,7 @@ const sendReportEmail = async (to, reportLink, candidateName) => {
     html: `
       <div style="${mainContainerStyle}">
         <div style="${contentWrapperStyle}">
-          <div style="${headerStyle}"><h1 style="${headerTextStyle}">Report Ready</h1></div>
+          ${emailHeader('Report Ready')}
           <div style="${bodyStyle}">
             <p>The automated interview report for <strong>${candidateName}</strong> has been generated and is now available for your review.</p>
             <p style="margin: 30px 0;"><a href="${reportLink}" style="${buttonStyle}">View Report</a></p>
@@ -137,7 +180,7 @@ const sendDecisionEmail = async (to, decision, comments, candidateName) => {
       html: `
         <div style="${mainContainerStyle}">
           <div style="${contentWrapperStyle}">
-            <div style="${headerStyle}"><h1 style="${headerTextStyle}">Interview Status Update</h1></div>
+            ${emailHeader('Interview Status Update')}
             <div style="${bodyStyle}">
               ${htmlBody}
             </div>
@@ -162,7 +205,7 @@ const sendPasswordResetEmail = async (to, resetCode, userName) => {
     html: `
       <div style="${mainContainerStyle}">
         <div style="${contentWrapperStyle}">
-          <div style="${headerStyle}"><h1 style="${headerTextStyle}">Password Reset</h1></div>
+          ${emailHeader('Password Reset')}
           <div style="${bodyStyle}">
             <h2 style="color: #FFFFFF;">Hello ${userName},</h2>
             <p>We received a request to reset your password. Use the code below to set a new password:</p>
@@ -180,9 +223,41 @@ const sendPasswordResetEmail = async (to, resetCode, userName) => {
   await sendMail(mailOptions);
 };
 
+/**
+ * Sends a 6-digit verification code email for account creation.
+ * @param {string} to - User's email address
+ * @param {string} code - 6-digit verification code
+ * @param {string} userName - User's first name
+ */
+const sendVerificationEmail = async (to, code, userName) => {
+  const mailOptions = {
+    to,
+    subject: 'Verify Your HireGenius Account',
+    html: `
+      <div style="${mainContainerStyle}">
+        <div style="${contentWrapperStyle}">
+          ${emailHeader('Verify Your Email')}
+          <div style="${bodyStyle}">
+            <h2 style="color: #FFFFFF;">Welcome ${userName}! 👋</h2>
+            <p>Thank you for creating your HireGenius account. Please use the verification code below to complete your registration:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <span style="display: inline-block; padding: 16px 40px; background-color: ${mailStyles.accentColor}; color: ${mailStyles.buttonTextColor}; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px;">${code}</span>
+            </div>
+            <p style="color: #bdbdbd;">This code is valid for <strong style="color: #FFE066;">10 minutes</strong>.</p>
+            <p style="color: #bdbdbd;">If you didn't create an account on HireGenius, please ignore this email.</p>
+          </div>
+          <div style="${footerStyle}">© ${new Date().getFullYear()} | HireGenius</div>
+        </div>
+      </div>
+    `
+  };
+  await sendMail(mailOptions);
+};
+
 module.exports = {
   sendInviteEmail,
   sendReportEmail,
   sendDecisionEmail,
   sendPasswordResetEmail,
+  sendVerificationEmail,
 };

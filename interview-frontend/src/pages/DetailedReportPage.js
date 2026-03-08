@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import * as apiClient from '../services/apiClient';
+import config from '../config';
 import ScoreCard from '../components/ScoreCard';
 import SkillsRadarChart from '../components/SkillsRadarChart';
 import DetailedAnalysisView from '../components/DetailedAnalysisView';
@@ -487,7 +488,7 @@ const BreakdownView = ({ responses, pagination, onPageChange }) => {
                                 </td>
                                 <td style={{ padding: '10px 8px', color: '#FFE066', fontFamily: 'inherit', fontWeight: 700, fontSize: '1.1rem' }}>{(res.aiScore).toFixed(1)}%</td>
                                 <td style={{ padding: '10px 8px', fontFamily: 'inherit' }}>
-                                    <audio ref={el => audioRefs.current[idx] = el} src={`http://localhost:5000${res.audioFileUrl}`} preload="none" style={{ display: 'none' }} />
+                                    <audio ref={el => audioRefs.current[idx] = el} src={`${config.BACKEND_URL}${res.audioFileUrl}`} preload="none" style={{ display: 'none' }} />
                                     <IconButton onClick={() => handlePlay(idx)} sx={{ color: '#FFE066', background: '#232526', borderRadius: 2, '&:hover': { background: '#FFE066', color: '#181818' } }}>
                                         <PlayArrowIcon fontSize="large" />
                                     </IconButton>

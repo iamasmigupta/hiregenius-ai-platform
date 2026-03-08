@@ -5,6 +5,8 @@ const InterviewSession = require('../models/interviewSession.model.js');
 const User = require('../models/user.model.js');
 const { sendInviteEmail, sendDecisionEmail } = require('../utils/mail');
 const InterviewReport = require('../models/interviewReport.model.js');
+const InterviewTemplate = require('../models/interviewTemplate.model.js');
+const pdfParse = require('pdf-parse');
 
 
 const createSession = async (req, res) => {
@@ -15,19 +17,36 @@ const createSession = async (req, res) => {
         throw new AppError(400, 'Template ID and Candidate ID are required.');
     }
 
-    const sessionData = { templateId, candidateId, interviewerId, scheduledAt };
+    // Extract resume text if a PDF was uploaded
+    let resumeText = '';
+    if (req.file) {
+        try {
+            const pdfData = await pdfParse(req.file.buffer);
+            resumeText = pdfData.text;
+        } catch (err) {
+            console.error('Failed to parse resume PDF:', err.message);
+            // Continue without resume — don't block interview creation
+        }
+    }
+
+    const sessionData = { templateId, candidateId, interviewerId, scheduledAt, resumeText };
     const newSession = await interviewService.createSessionFromTemplate(sessionData);
 
-    // Send invitation email to the candidate
+    // Send invitation email with calendar invite to the candidate
     const candidate = await User.findById(candidateId);
     if (candidate) {
         const interviewLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/instructions/${newSession.uniqueLink}`;
-        await sendInviteEmail(candidate.email, interviewLink, candidate.firstName);
+        const template = await InterviewTemplate.findById(templateId);
+        await sendInviteEmail(candidate.email, interviewLink, candidate.firstName, {
+            scheduledAt,
+            durationMinutes: template?.durationMinutes || 60,
+            templateTitle: template?.title || 'AI Interview',
+        });
     }
 
     res.status(201).json({
         success: true,
-        message: 'Interview session created successfully.',
+        message: resumeText ? 'Interview scheduled with resume-personalized questions!' : 'Interview session created successfully.',
         data: newSession,
     });
 };

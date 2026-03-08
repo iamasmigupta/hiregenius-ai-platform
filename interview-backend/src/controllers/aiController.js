@@ -17,11 +17,20 @@ const answerAnalysisConfig = {
   maxOutputTokens: 4096,
 };
 
-async function generateInterviewFromJD(jobDescription, numberOfQuestions) {
-  console.log(`Generating ${numberOfQuestions} questions for job description: "${jobDescription?.substring(0, 80)}..."`);
+async function generateInterviewFromJD(jobDescription, numberOfQuestions, resumeText = '') {
+  console.log(`Generating ${numberOfQuestions} questions for job description: "${jobDescription?.substring(0, 80)}..."${resumeText ? ' (with resume)' : ''}`);
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: questionGenerationConfig });
+
+  const resumeSection = resumeText ? `
+    IMPORTANT: A candidate's resume has been provided. You MUST tailor questions to probe the candidate's specific experience, skills, and projects mentioned in their resume while also covering the requirements of the job description. Ask questions that connect their past experience to the role's needs.
+
+    Here is the Candidate's Resume:
+    ${resumeText}
+  ` : '';
+
   const prompt = `
     You are an expert technical recruiter. Your task is to create a structured interview based on the provided job description.
+    ${resumeText ? 'The interview questions should be personalized based on the candidate\'s resume AND the job requirements.' : ''}
     Generate exactly ${numberOfQuestions} diverse questions.
     For each question, you MUST provide the following fields in a valid JSON object:
     - "questionText": The full text of the question.
@@ -34,22 +43,14 @@ async function generateInterviewFromJD(jobDescription, numberOfQuestions) {
 
     Here is the Job Description:
     ${jobDescription}
+    ${resumeSection}
   `;
   try {
-    console.log("Calling Gemini API with model: gemini-1.5-flash");
-    console.log("API Key present:", !!config.geminiAPIKey, "Key prefix:", config.geminiAPIKey?.substring(0, 10));
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json\n|```/g, '').trim();
-    console.log("Gemini response received, length:", text.length);
     return JSON.parse(text);
   } catch (error) {
-    console.error("=== GEMINI API ERROR ===");
-    console.error("Error name:", error.name);
-    console.error("Error message:", error.message);
-    console.error("Error status:", error.status);
-    console.error("Error details:", JSON.stringify(error.errorDetails || error.details || {}, null, 2));
-    console.error("Full error:", error);
-    console.error("========================");
+    console.error("Error generating interview from AI:", error.message || error);
     throw new Error("Failed to generate interview questions from the provided job description.");
   }
 }

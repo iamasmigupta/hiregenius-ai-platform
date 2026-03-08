@@ -1,17 +1,18 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+import config from '../config';
+const API_BASE_URL = config.API_BASE_URL;
 
 const request = async (endpoint, options = {}) => {
     const url = `${API_BASE_URL}${endpoint}`;
     const token = localStorage.getItem('token');
-    const config = {
+    const requestConfig = {
         headers: { 'Content-Type': 'application/json', ...options.headers },
         ...options,
     };
     if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
+        requestConfig.headers['Authorization'] = `Bearer ${token}`;
     }
     try {
-        const response = await fetch(url, config);
+        const response = await fetch(url, requestConfig);
         if (!response.ok) {
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.indexOf('application/json') !== -1) {
@@ -57,13 +58,31 @@ export const forgotPassword = (email) => request('/auth/forgot-password', { meth
 export const resetPasswordWithOTP = (data) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify(data) });
 export const changePassword = (data) => request('/auth/change-password', { method: 'PUT', body: JSON.stringify(data) });
 export const signup = (userData) => request('/auth/signup', { method: 'POST', body: JSON.stringify(userData) });
+export const verifyEmail = (data) => request('/auth/verify-email', { method: 'POST', body: JSON.stringify(data) });
+export const resendVerificationCode = (email) => request('/auth/resend-code', { method: 'POST', body: JSON.stringify({ email }) });
 
 export const createTemplate = (templateData) => request('/templates', { method: 'POST', body: JSON.stringify(templateData) });
 export const getTemplates = () => request('/templates');
 
 export const getCandidates = () => request('/users?role=candidate');
 
-export const createSession = (sessionData) => request('/interview/sessions', { method: 'POST', body: JSON.stringify(sessionData) });
+export const createSession = async (sessionData, resumeFile) => {
+    const url = `${API_BASE_URL}/interview/sessions`;
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('templateId', sessionData.templateId);
+    formData.append('candidateId', sessionData.candidateId);
+    formData.append('scheduledAt', sessionData.scheduledAt);
+    if (resumeFile) formData.append('resume', resumeFile);
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetch(url, { method: 'POST', headers, body: formData });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create session.');
+    }
+    return response.json();
+};
 export const getSessionByLink = (uniqueLink) => request(`/interview/sessions/${uniqueLink}`);
 export const submitResponse = (sessionId, responseData) => request(`/interview/sessions/${sessionId}/responses`, { method: 'POST', body: JSON.stringify(responseData) });
 export const getMySessions = () => request('/interview/sessions/my-sessions');
@@ -152,3 +171,23 @@ export const getRecentInterviews = () => request('/users/admin/recent-interviews
 
 export const updateProfile = (profileData) => request('/users/me', { method: 'PUT', body: JSON.stringify(profileData) });
 export const deleteAccount = () => request('/users/me', { method: 'DELETE' });
+
+// Resume Parsing
+export const parseResume = async (file, candidateId) => {
+    const url = `${API_BASE_URL}/resume/parse`;
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('resume', file);
+    if (candidateId) formData.append('candidateId', candidateId);
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetch(url, { method: 'POST', headers, body: formData });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to parse resume.');
+    }
+    return response.json();
+};
+
+export const saveResumeToProfile = (candidateId, parsedResume) =>
+    request(`/resume/save/${candidateId}`, { method: 'PUT', body: JSON.stringify({ parsedResume }) });

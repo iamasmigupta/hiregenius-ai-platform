@@ -2,7 +2,7 @@ const User = require('../models/user.model');
 const config = require('../config');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendPasswordResetEmail } = require('../utils/mail');
+const { sendPasswordResetEmail, sendVerificationEmail } = require('../utils/mail');
 
 /**
  * Generates a JSON Web Token for a given user ID.
@@ -32,7 +32,8 @@ const registerUser = async (req, res) => {
         throw new Error('User with this email already exists.');
     }
 
-    const user = await User.create({ firstName, lastName, email, password, role });
+    // Admin-created users are auto-verified
+    const user = await User.create({ firstName, lastName, email, password, role, isEmailVerified: true });
 
     if (user) {
         const token = generateToken(user._id);
@@ -66,6 +67,11 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
 
     if (user && (await user.comparePassword(password))) {
+        // Block login for unverified users (existing users without the field are treated as verified)
+        if (user.isEmailVerified === false) {
+            res.status(403);
+            throw new Error('Please verify your email before logging in. Check your inbox for the verification code.');
+        }
         const token = generateToken(user._id);
         res.status(200).json({
             _id: user._id,
@@ -97,23 +103,18 @@ const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-        // Don't reveal whether user exists for security
         return res.status(200).json({
             status: 'success',
             message: 'If an account with that email exists, a reset code has been sent.',
         });
     }
 
-    // Generate a 6-digit OTP
     const resetOTP = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Hash the OTP and store it
     const hashedToken = crypto.createHash('sha256').update(resetOTP).digest('hex');
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
+    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
     await user.save({ validateBeforeSave: false });
 
-    // Send email
     try {
         await sendPasswordResetEmail(user.email, resetOTP, user.firstName);
         res.status(200).json({
@@ -206,7 +207,7 @@ const changePassword = async (req, res) => {
 };
 
 /**
- * @desc    Self-register (public sign up)
+ * @desc    Self-register (public sign up) — sends 6-digit verification code to email
  * @route   POST /api/auth/signup
  * @access  Public
  */
@@ -218,7 +219,6 @@ const selfRegister = async (req, res) => {
         throw new Error('Please provide all required fields.');
     }
 
-    // Only allow interviewer and hr_manager for self-registration
     const allowedRoles = ['interviewer', 'hr_manager'];
     if (!allowedRoles.includes(role)) {
         res.status(400);
@@ -231,22 +231,119 @@ const selfRegister = async (req, res) => {
         throw new Error('User with this email already exists.');
     }
 
-    const user = await User.create({ firstName, lastName, email, password, role });
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedCode = crypto.createHash('sha256').update(verificationCode).digest('hex');
+
+    const user = await User.create({
+        firstName, lastName, email, password, role,
+        isEmailVerified: false,
+        verificationCode: hashedCode,
+        verificationCodeExpire: Date.now() + 10 * 60 * 1000,
+    });
 
     if (user) {
-        const token = generateToken(user._id);
+        try {
+            await sendVerificationEmail(user.email, verificationCode, user.firstName);
+        } catch (err) {
+            console.error('Failed to send verification email:', err.message);
+        }
+
         res.status(201).json({
-            _id: user._id,
-            firstName: user.firstName,
-            lastName: user.lastName,
+            status: 'success',
+            message: 'Account created! A verification code has been sent to your email.',
             email: user.email,
-            role: user.role,
-            token: token,
+            requiresVerification: true,
         });
     } else {
         res.status(400);
         throw new Error('Invalid user data received.');
     }
+};
+
+/**
+ * @desc    Verify email with 6-digit code
+ * @route   POST /api/auth/verify-email
+ * @access  Public
+ */
+const verifyEmail = async (req, res) => {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+        res.status(400);
+        throw new Error('Please provide email and verification code.');
+    }
+
+    const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+
+    const user = await User.findOne({
+        email,
+        verificationCode: hashedCode,
+        verificationCodeExpire: { $gt: Date.now() },
+    }).select('+verificationCode +verificationCodeExpire');
+
+    if (!user) {
+        res.status(400);
+        throw new Error('Invalid or expired verification code.');
+    }
+
+    user.isEmailVerified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    const token = generateToken(user._id);
+    res.status(200).json({
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        token: token,
+        message: 'Email verified successfully!',
+    });
+};
+
+/**
+ * @desc    Resend verification code
+ * @route   POST /api/auth/resend-code
+ * @access  Public
+ */
+const resendVerificationCode = async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        res.status(400);
+        throw new Error('Please provide your email address.');
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        return res.status(200).json({ status: 'success', message: 'If the account exists, a new code has been sent.' });
+    }
+
+    if (user.isEmailVerified) {
+        res.status(400);
+        throw new Error('This email is already verified.');
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedCode = crypto.createHash('sha256').update(verificationCode).digest('hex');
+
+    user.verificationCode = hashedCode;
+    user.verificationCodeExpire = Date.now() + 10 * 60 * 1000;
+    await user.save({ validateBeforeSave: false });
+
+    try {
+        await sendVerificationEmail(user.email, verificationCode, user.firstName);
+    } catch (err) {
+        console.error('Failed to resend verification email:', err.message);
+    }
+
+    res.status(200).json({
+        status: 'success',
+        message: 'A new verification code has been sent to your email.',
+    });
 };
 
 module.exports = {
@@ -256,4 +353,6 @@ module.exports = {
     resetPassword,
     changePassword,
     selfRegister,
+    verifyEmail,
+    resendVerificationCode,
 };

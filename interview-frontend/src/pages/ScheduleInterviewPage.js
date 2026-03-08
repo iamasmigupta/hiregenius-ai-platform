@@ -6,12 +6,16 @@ import {
 } from '@mui/material';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 const loadingMessages = [
-    "Contacting AI for analysis...",
-    "Analyzing job description...",
-    "Generating behavioral questions...",
+    "Uploading resume & job description...",
+    "AI is reading the candidate's resume...",
+    "Matching skills to job requirements...",
+    "Generating personalized questions...",
     "Crafting technical challenges...",
+    "Building behavioral scenarios...",
     "Finalizing interview session...",
     "Almost there..."
 ];
@@ -71,6 +75,8 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
     const steps = ['Template', 'Candidate', 'Time', 'Confirm'];
     const [activeStep, setActiveStep] = useState(0);
     const [minTime, setMinTime] = useState(getInitialTime());
+    const [resumeFile, setResumeFile] = useState(null);
+    const resumeInputRef = useRef(null);
 
     const getScheduledAt = () => {
         if (!scheduledDate || !scheduledTime) return '';
@@ -125,9 +131,11 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                 candidateId: selectedCandidate,
                 scheduledAt
             };
-            const response = await apiClient.createSession(sessionData);
+            const response = await apiClient.createSession(sessionData, resumeFile || undefined);
+            const candidateObj = candidates.find(c => c._id === selectedCandidate);
+            const candidateLabel = candidateObj ? `${candidateObj.firstName} ${candidateObj.lastName} (${candidateObj.email})` : '';
             setSuccessInfo({
-                message: 'Interview scheduled successfully!',
+                message: `🎉 Interview has been scheduled for ${candidateLabel}! An invitation email with a calendar invite has been sent.`,
                 link: `${window.location.origin}/interview/${response.data.uniqueLink}`
             });
             setSelectedTemplate('');
@@ -257,6 +265,47 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                                 ))}
                             </Select>
                         </FormControl>
+
+                        {/* Resume Upload Area */}
+                        <Box
+                            onClick={() => resumeInputRef.current?.click()}
+                            sx={{
+                                p: 2.5,
+                                border: resumeFile ? '2px solid #4caf50' : '2px dashed #555',
+                                borderRadius: 2,
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                background: resumeFile ? 'rgba(76, 175, 80, 0.06)' : 'transparent',
+                                '&:hover': { borderColor: '#FFE066', background: 'rgba(255,224,102,0.04)' },
+                            }}
+                        >
+                            <input
+                                ref={resumeInputRef}
+                                type="file"
+                                accept="application/pdf"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                    const f = e.target.files[0];
+                                    if (f && f.type === 'application/pdf') setResumeFile(f);
+                                }}
+                            />
+                            {resumeFile ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                                    <DescriptionIcon sx={{ color: '#4caf50' }} />
+                                    <Typography sx={{ color: '#4caf50', fontWeight: 600 }}>{resumeFile.name}</Typography>
+                                    <Typography sx={{ color: '#999', fontSize: '0.8rem' }}>({(resumeFile.size / (1024*1024)).toFixed(1)} MB)</Typography>
+                                    <Button size="small" onClick={(e) => { e.stopPropagation(); setResumeFile(null); }} sx={{ color: '#ff5252', ml: 1, minWidth: 'auto' }}>✕</Button>
+                                </Box>
+                            ) : (
+                                <Box>
+                                    <CloudUploadIcon sx={{ color: '#666', fontSize: 32, mb: 0.5 }} />
+                                    <Typography sx={{ color: '#bdbdbd', fontWeight: 600, fontSize: '0.95rem' }}>Upload Candidate's Resume (PDF)</Typography>
+                                    <Typography sx={{ color: '#666', fontSize: '0.8rem' }}>Optional — AI will tailor questions to their experience</Typography>
+                                </Box>
+                            )}
+                        </Box>
+
                         <DatePicker
                             label="Scheduled Date"
                             value={scheduledDate}

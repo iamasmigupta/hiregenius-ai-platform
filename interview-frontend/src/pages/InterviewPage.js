@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import * as apiClient from '../services/apiClient';
+import config from '../config';
 import AudioRecorder from '../components/AudioRecorder';
 import { Box, Typography, Paper, Button, CircularProgress, Snackbar, Alert } from '@mui/material';
 import TerminatedPage from './TerminatedPage';
@@ -337,7 +338,7 @@ const InterviewPage = ({ uniqueLink: propUniqueLink, onInterviewComplete }) => {
                 const imageData = canvas.toDataURL('image/jpeg', 0.7);
 
                 try {
-                    const res = await fetch('http://localhost:5001/proctor', {
+                    const res = await fetch(`${config.PROCTOR_API_URL}/proctor`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ image: imageData, session_id: sessionData._id }),

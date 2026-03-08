@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Paper, Button, Alert, CircularProgress } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import config from '../config';
 
 // Simple API client for this page
 const apiClient = {
@@ -10,7 +11,7 @@ const apiClient = {
         formData.append('frame', imageBlob, 'frame.jpg');
         
         // This endpoint will need to be created in your Flask proctoring API
-        const response = await fetch('http://localhost:5001/analyze_frame', {
+        const response = await fetch(`${config.PROCTOR_API_URL}/analyze_frame`, {
             method: 'POST',
             body: formData,
         });

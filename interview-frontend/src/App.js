@@ -7,7 +7,7 @@ import AccountCircle from '@mui/icons-material/AccountCircle';
 
 // Import all pages
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
+
 import CandidateDashboard from './pages/CandidateDashboard';
 import InstructionsPage from './pages/InstructionsPage';
 import InterviewPage from './pages/InterviewPage';
@@ -42,7 +42,7 @@ function App() {
     const [resourceCheckedFor, setResourceCheckedFor] = useState(null);
     // Candidate menu/dialog state
     const [anchorEl, setAnchorEl] = useState(null);
-    const menuOpen = Boolean(anchorEl);
+
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [pwOpen, setPwOpen] = useState(false);
     const [pwData, setPwData] = useState({ currentPassword: '', newPassword: '', confirm: '' });

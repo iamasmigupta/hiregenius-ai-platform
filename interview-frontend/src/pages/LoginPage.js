@@ -283,8 +283,8 @@ const LoginPage = ({ onLoginSuccess }) => {
                 <Typography variant="body2" sx={{ color: '#bdbdbd', fontSize: '0.75rem' }}>
                     Made with ❤️ by Asmi Gupta
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#666', fontSize: '0.7rem', mt: 0.5 }}>
-                    © Copyright HireGenius 2026
+                <Typography variant="body2" sx={{ color: '#888', fontSize: '0.7rem', mt: 0.5 }}>
+                    © 2026 | HireGenius
                 </Typography>
             </Box>
         </Box>

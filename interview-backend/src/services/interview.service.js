@@ -9,7 +9,7 @@ const { sendReportEmail, sendDecisionEmail } = require('../utils/mail');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 
-const createSessionFromTemplate = async ({ templateId, candidateId, interviewerId, scheduledAt }) => {
+const createSessionFromTemplate = async ({ templateId, candidateId, interviewerId, scheduledAt, resumeText }) => {
     const template = await InterviewTemplate.findById(templateId);
     if (!template) {
         throw new AppError(404, 'Interview template not found.');
@@ -18,7 +18,7 @@ const createSessionFromTemplate = async ({ templateId, candidateId, interviewerI
     if (!candidate || candidate.role !== 'candidate') {
         throw new AppError(404, 'A valid candidate could not be found for the provided ID.');
     }
-    const generatedQuestions = await generateInterviewFromJD(template.jobDescription, template.numberOfQuestions);
+    const generatedQuestions = await generateInterviewFromJD(template.jobDescription, template.numberOfQuestions, resumeText || '');
     if (!generatedQuestions || generatedQuestions.length === 0) {
         throw new AppError(500, 'AI failed to generate questions for the interview.');
     }

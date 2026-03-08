@@ -57,6 +57,40 @@ const userSchema = new mongoose.Schema({
         default: true
         // Flag to deactivate users without deleting their records.
     },
+    // Email verification fields
+    isEmailVerified: {
+        type: Boolean,
+        default: false,
+    },
+    verificationCode: {
+        type: String,
+        select: false,
+    },
+    verificationCodeExpire: {
+        type: Date,
+        select: false,
+    },
+    // Resume parsing fields (for candidates)
+    resumeUrl: {
+        type: String,
+        trim: true,
+        // Path to the uploaded resume PDF file
+    },
+    parsedResume: {
+        skills: [{ type: String }],
+        experience: [{
+            title: String,
+            company: String,
+            duration: String,
+            description: String,
+        }],
+        education: [{
+            degree: String,
+            institution: String,
+            year: String,
+        }],
+        summary: String,
+    },
     // Password reset fields
     resetPasswordToken: {
         type: String,

@@ -93,7 +93,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 // --- API Routes ---
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/uploads', (req, res, next) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+}, express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authLimiter, authRoutes); // Stricter rate limit on auth
 app.use('/api/interview', apiLimiter, interviewRoutes);
 app.use('/api/templates', apiLimiter, templateRoutes);

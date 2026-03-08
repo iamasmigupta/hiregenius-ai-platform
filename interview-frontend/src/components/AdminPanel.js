@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, Paper, Grid, Card, CardContent, CircularProgress, Divider } from '@mui/material';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import React, { useEffect, useState } from 'react';
+import { Box, Typography, Paper, CircularProgress, Divider } from '@mui/material';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import * as apiClient from '../services/apiClient';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';

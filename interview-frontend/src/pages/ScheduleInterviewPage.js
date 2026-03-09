@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as apiClient from '../services/apiClient';
 import {
     Box, Typography, Paper, Button, Alert, CircularProgress, Stepper, Step, StepLabel,
-    Select, MenuItem, FormControl, InputLabel
+    Select, MenuItem, FormControl, InputLabel, Snackbar
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -71,6 +72,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
     const [loadingMessage, setLoadingMessage] = useState('Scheduling...');
     const [error, setError] = useState('');
     const [successInfo, setSuccessInfo] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '' });
     const loadingIntervalRef = useRef(null);
     const steps = ['Template', 'Candidate', 'Time', 'Confirm'];
     const [activeStep, setActiveStep] = useState(0);
@@ -138,6 +140,7 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                 message: `🎉 Interview has been scheduled for ${candidateLabel}! An invitation email with a calendar invite has been sent.`,
                 link: `${window.location.origin}/interview/${response.data.uniqueLink}`
             });
+            setSnackbar({ open: true, message: `📧 Interview invitation email sent to ${candidateObj?.email || 'candidate'}` });
             setSelectedTemplate('');
             setSelectedCandidate('');
             setActiveStep(steps.length);
@@ -368,6 +371,29 @@ const CreateInterviewForm = ({ templates, candidates, onCreate }) => {
                 </Button>
             </form>
         </Paper>
+        <Snackbar
+            open={snackbar.open}
+            autoHideDuration={6000}
+            onClose={() => setSnackbar({ open: false, message: '' })}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+            <Alert
+                onClose={() => setSnackbar({ open: false, message: '' })}
+                severity="success"
+                icon={<CheckCircleIcon sx={{ color: '#181818' }} />}
+                sx={{
+                    bgcolor: '#FFE066',
+                    color: '#181818',
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                    borderRadius: 2,
+                    boxShadow: '0 4px 24px rgba(255,224,102,0.3)',
+                    '& .MuiAlert-action .MuiSvgIcon-root': { color: '#181818' },
+                }}
+            >
+                {snackbar.message}
+            </Alert>
+        </Snackbar>
     );
 };
 

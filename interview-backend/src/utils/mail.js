@@ -1,11 +1,13 @@
 const nodemailer = require('nodemailer');
-const { Resend } = require('resend');
+const sgMail = require('@sendgrid/mail');
 const ical = require('ical-generator').default;
 const config = require('../config');
 
-// Use Resend in production (HTTPS-based, works on Render), Gmail SMTP for local dev
-const isProduction = config.nodeEnv === 'production' && config.resendApiKey;
-const resend = isProduction ? new Resend(config.resendApiKey) : null;
+// Use SendGrid in production (HTTPS-based, works on Render), Gmail SMTP for local dev
+const isProduction = config.nodeEnv === 'production' && config.sendgridApiKey;
+if (isProduction) {
+  sgMail.setApiKey(config.sendgridApiKey);
+}
 
 // Gmail SMTP fallback for local development
 const transporter = !isProduction ? nodemailer.createTransport({
@@ -41,21 +43,20 @@ const logoPath = path.join(__dirname, '..', '..', 'public', 'logo-hiregenius.png
 const emailHeader = (title = 'HireGenius') => `<div style="${headerStyle}"><h1 style="${headerTextStyle}">${title}</h1></div>`;
 
 /**
- * Generic mail sending function — uses Resend in production, Nodemailer locally
+ * Generic mail sending function — uses SendGrid in production, Nodemailer locally
  * @param {object} mailOptions - Mail options (to, subject, html, attachments)
  */
 const sendMail = async (mailOptions) => {
   try {
-    if (isProduction && resend) {
-      // Resend API — uses HTTPS, works on all cloud platforms
-      const { data, error } = await resend.emails.send({
-        from: `HireGenius <${config.resendFromEmail || 'onboarding@resend.dev'}>`,
+    if (isProduction) {
+      // SendGrid API — uses HTTPS, works on all cloud platforms
+      await sgMail.send({
         to: mailOptions.to,
+        from: config.senderEmail,
         subject: mailOptions.subject,
         html: mailOptions.html,
       });
-      if (error) throw new Error(error.message);
-      console.log(`Email sent via Resend to ${mailOptions.to}`);
+      console.log(`Email sent via SendGrid to ${mailOptions.to}`);
     } else {
       // Gmail SMTP — for local development
       const logoAttachment = {

@@ -16,6 +16,7 @@ module.exports = {
     backendUrl: process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`,
     resendApiKey: process.env.RESEND_API_KEY,
     resendFromEmail: process.env.RESEND_FROM_EMAIL,
+    sendgridApiKey: process.env.SENDGRID_API_KEY,
     senderEmail: process.env.SENDER_EMAIL,
     senderPassword: process.env.SENDER_PASSWORD,
 };

@@ -1,15 +1,20 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const ical = require('ical-generator').default;
 const config = require('../config');
 
-// Create transporter — uses Gmail service which works on cloud platforms
-const transporter = nodemailer.createTransport({
+// Use Resend in production (HTTPS-based, works on Render), Gmail SMTP for local dev
+const isProduction = config.nodeEnv === 'production' && config.resendApiKey;
+const resend = isProduction ? new Resend(config.resendApiKey) : null;
+
+// Gmail SMTP fallback for local development
+const transporter = !isProduction ? nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: config.senderEmail,
     pass: config.senderPassword,
   }
-});
+}) : null;
 
 // Reusable styling constants
 const mailStyles = {
@@ -30,28 +35,41 @@ const bodyStyle = `padding: 30px; color: ${mailStyles.textColor}; line-height: 1
 const buttonStyle = `display: inline-block; padding: 12px 24px; background-color: ${mailStyles.accentColor}; color: ${mailStyles.buttonTextColor}; text-decoration: none; border-radius: 6px; font-weight: bold;`;
 const footerStyle = `text-align: center; font-size: 12px; color: #777777; padding: 20px 30px; border-top: 1px solid ${mailStyles.borderColor};`;
 
-// Logo path for CID email attachment
+// Logo path for CID email attachment (local dev only)
 const path = require('path');
 const logoPath = path.join(__dirname, '..', '..', 'public', 'logo-hiregenius.png');
-const emailHeader = (title = 'HireGenius') => `<div style="${headerStyle}"><h1 style="${headerTextStyle}"><img src="cid:hiregenius-logo" alt="" style="height:32px;width:32px;vertical-align:middle;margin-right:8px;" />${title}</h1></div>`;
+const emailHeader = (title = 'HireGenius') => `<div style="${headerStyle}"><h1 style="${headerTextStyle}">${title}</h1></div>`;
 
 /**
- * Generic mail sending function — auto-attaches logo for CID embedding
- * @param {object} mailOptions - Nodemailer mail options
+ * Generic mail sending function — uses Resend in production, Nodemailer locally
+ * @param {object} mailOptions - Mail options (to, subject, html, attachments)
  */
 const sendMail = async (mailOptions) => {
   try {
-    const logoAttachment = {
-      filename: 'logo-hiregenius.png',
-      path: logoPath,
-      cid: 'hiregenius-logo',
-    };
-    const baseOptions = {
-      from: `"HireGenius" <${config.senderEmail}>`,
-      attachments: [...(mailOptions.attachments || []), logoAttachment],
-    };
-    await transporter.sendMail({ ...baseOptions, ...mailOptions, attachments: baseOptions.attachments });
-    console.log(`Email sent successfully to ${mailOptions.to}`);
+    if (isProduction && resend) {
+      // Resend API — uses HTTPS, works on all cloud platforms
+      const { data, error } = await resend.emails.send({
+        from: `HireGenius <${config.resendFromEmail || 'onboarding@resend.dev'}>`,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
+      if (error) throw new Error(error.message);
+      console.log(`Email sent via Resend to ${mailOptions.to}`);
+    } else {
+      // Gmail SMTP — for local development
+      const logoAttachment = {
+        filename: 'logo-hiregenius.png',
+        path: logoPath,
+        cid: 'hiregenius-logo',
+      };
+      const baseOptions = {
+        from: `"HireGenius" <${config.senderEmail}>`,
+        attachments: [...(mailOptions.attachments || []), logoAttachment],
+      };
+      await transporter.sendMail({ ...baseOptions, ...mailOptions, attachments: baseOptions.attachments });
+      console.log(`Email sent via Gmail to ${mailOptions.to}`);
+    }
   } catch (error) {
     console.error(`Failed to send email to ${mailOptions.to}:`, error);
   }

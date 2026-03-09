@@ -27,6 +27,7 @@
     "nodemailer-smtp-transport": "^2.7.4",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.13.0",
+    "resend": "^6.9.3",
     "string-similarity": "^4.0.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",

@@ -1,20 +1,15 @@
 const nodemailer = require('nodemailer');
-const smtpTransport = require('nodemailer-smtp-transport');
 const ical = require('ical-generator').default;
 const config = require('../config');
 
-// Create transporter using credentials from .env
-const transporter = nodemailer.createTransport(
-  smtpTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // SSL
-    auth: {
-      user: config.senderEmail,
-      pass: config.senderPassword,
-    }
-  })
-);
+// Create transporter — uses Gmail service which works on cloud platforms
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: config.senderEmail,
+    pass: config.senderPassword,
+  }
+});
 
 // Reusable styling constants
 const mailStyles = {

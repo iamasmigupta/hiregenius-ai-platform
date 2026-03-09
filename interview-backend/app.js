@@ -25,6 +25,7 @@ const app = express();
 connectDB();
 
 // --- Security Middleware ---
+app.set('trust proxy', 1); // Trust first proxy (Render, Vercel, etc.)
 app.use(helmet()); // Set security HTTP headers
 
 // Rate limiting - prevent brute force / DDoS
